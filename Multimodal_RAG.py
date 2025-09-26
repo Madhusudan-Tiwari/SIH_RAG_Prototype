@@ -1,9 +1,6 @@
 # Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
-import os
-
-# ----------------- Project Modules -----------------
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
 from modules.embeddings import get_text_embedding, get_image_embedding
 from modules.vector_db import VectorDB
@@ -26,6 +23,10 @@ top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 
 # ----------------- Initialize Vector DB -----------------
 vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
+
+# ----------------- Initialize conversation -----------------
+if "conversation" not in st.session_state:
+    st.session_state.conversation = []  # [{"role": "user"/"assistant", "content": "..."}]
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
@@ -70,22 +71,42 @@ else:
     if uploaded_files:
         for file in uploaded_files:
             st.write(f"Processing: {file.name}")
-            ext = Path(file.name).suffix.lower()
             content, emb = process_and_store(Path(file.name))
             if content is not None:
                 st.text_area(f"Preview / embedding info: {file.name}", content, height=150)
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
-# ----------------- Query Section -----------------
-st.subheader("Ask a question")
-user_query = st.text_area("Type your question here...", height=100)
-if st.button("Get Answer"):
-    if not user_query.strip():
-        st.warning("Please type a question!")
-    else:
-        # Retrieve top-k relevant contexts
-        top_texts = vector_db.query_top_k(user_query, k=top_k)
-        # Feed context + question to LLM
-        answer = query_llm_with_context(user_query, top_texts)
-        st.success(answer)
+# ----------------- Chat Section -----------------
+st.subheader("Chat with your data")
+
+user_input = st.text_area("Type your question...", height=100)
+if st.button("Send") and user_input.strip():
+    # Append user message
+    st.session_state.conversation.append({"role": "user", "content": user_input})
+
+    # Retrieve top-k relevant contexts
+    top_texts = vector_db.query_top_k(user_input, k=top_k)
+
+    # Query LLM with full conversation + retrieved contexts
+    # Combine conversation into one string for context
+    conversation_context = "\n".join(
+        f"{msg['role'].capitalize()}: {msg['content']}" for msg in st.session_state.conversation
+    )
+    answer = query_llm_with_context(user_input, top_texts, conversation_context)
+
+    # Append assistant message
+    st.session_state.conversation.append({"role": "assistant", "content": answer})
+
+    # Rerun to refresh chat display
+    st.experimental_rerun()
+
+# ----------------- Display chat history -----------------
+st.subheader("Conversation History")
+chat_container = st.container()
+with chat_container:
+    for msg in st.session_state.conversation:
+        if msg["role"] == "user":
+            st.markdown(f"<div style='text-align:right; background-color:#DCF8C6; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='text-align:left; background-color:#F1F0F0; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
