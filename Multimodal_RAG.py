@@ -11,7 +11,6 @@ SUPPORTED_TEXT = [".pdf", ".docx"]
 SUPPORTED_IMAGE = [".png", ".jpg", ".jpeg"]
 SUPPORTED_AUDIO = [".wav", ".mp3"]
 
-# ----------------- Streamlit Setup -----------------
 st.set_page_config(page_title="🎯 Multimodal RAG Prototype", layout="wide")
 st.title("🎯 Multimodal RAG Prototype")
 st.caption("Upload files or test on sample files. Supports English/Hindi/Punjabi.")
@@ -21,11 +20,13 @@ mode = st.sidebar.radio("Choose input mode", ["Sample Files", "Upload Files"])
 top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 
 # ----------------- Initialize Vector DB -----------------
-vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
+vector_db = VectorDB(dim=512)
 
-# ----------------- Initialize conversation -----------------
+# ----------------- Initialize session state -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []  # [{"role": "user"/"assistant", "content": "..."}]
+    st.session_state.conversation = []
+if "user_input" not in st.session_state:
+    st.session_state.user_input = ""
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
@@ -54,7 +55,7 @@ if mode == "Sample Files":
         selected_file = st.selectbox("Select a sample file", sample_files)
         st.write(f"Selected: {selected_file.name}")
         content, emb = process_and_store(selected_file)
-        if content is not None:
+        if content:
             st.text_area("Preview / embedding info", content, height=150)
             if emb is not None:
                 st.text(f"Embedding vector shape: {emb.shape}")
@@ -71,35 +72,34 @@ else:
         for file in uploaded_files:
             st.write(f"Processing: {file.name}")
             content, emb = process_and_store(Path(file.name))
-            if content is not None:
+            if content:
                 st.text_area(f"Preview / embedding info: {file.name}", content, height=150)
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
 # ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
-
-user_input = st.text_area("Type your question...", height=100)
+st.text_area("Type your question...", key="user_input", height=100)
 if st.button("Send"):
-    user_input = st.session_state.get("user_input", "")
-    if user_input.strip():
-        # process input
+    user_input = st.session_state.user_input.strip()
+    if user_input:
         top_texts = vector_db.query_top_k(user_input, k=top_k)
-        answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
-        # save chat
+        # Build conversation context
+        conversation_context = "\n".join(
+            f"{msg['role'].capitalize()}: {msg['content']}" 
+            for msg in st.session_state.conversation
+        )
+        answer = query_llm_with_context(user_input, top_texts, conversation_context)
+        # Save messages
         st.session_state.conversation.append({"role": "user", "content": user_input})
         st.session_state.conversation.append({"role": "assistant", "content": answer})
-        # clear input box
+        # Clear input
         st.session_state.user_input = ""
-        # Instead of rerun, just continue; Streamlit reruns automatically on button click
-
 
 # ----------------- Display chat history -----------------
 st.subheader("Conversation History")
-chat_container = st.container()
-with chat_container:
-    for msg in st.session_state.conversation:
-        if msg["role"] == "user":
-            st.markdown(f"<div style='text-align:right; background-color:#DCF8C6; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div style='text-align:left; background-color:#F1F0F0; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
+for msg in st.session_state.conversation:
+    if msg["role"] == "user":
+        st.markdown(f"<div style='text-align:right; background-color:#DCF8C6; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div style='text-align:left; background-color:#F1F0F0; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
