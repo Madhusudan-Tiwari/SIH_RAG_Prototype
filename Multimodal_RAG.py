@@ -80,24 +80,19 @@ else:
 st.subheader("Chat with your data")
 
 user_input = st.text_area("Type your question...", height=100)
-if st.button("Send") and user_input.strip():
-    # Append user message
-    st.session_state.conversation.append({"role": "user", "content": user_input})
+if st.button("Send"):
+    user_input = st.session_state.get("user_input", "")
+    if user_input.strip():
+        # process input
+        top_texts = vector_db.query_top_k(user_input, k=top_k)
+        answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
+        # save chat
+        st.session_state.conversation.append({"role": "user", "content": user_input})
+        st.session_state.conversation.append({"role": "assistant", "content": answer})
+        # clear input box
+        st.session_state.user_input = ""
+        # Instead of rerun, just continue; Streamlit reruns automatically on button click
 
-    # Retrieve top-k relevant contexts
-    top_texts = vector_db.query_top_k(user_input, k=top_k)
-
-    # Query LLM with full conversation + retrieved contexts
-    conversation_context = "\n".join(
-        f"{msg['role'].capitalize()}: {msg['content']}" for msg in st.session_state.conversation
-    )
-    answer = query_llm_with_context(user_input, top_texts, conversation_context)
-
-    # Append assistant message
-    st.session_state.conversation.append({"role": "assistant", "content": answer})
-
-    # Rerun to refresh chat display
-    st.experimental_rerun()
 
 # ----------------- Display chat history -----------------
 st.subheader("Conversation History")
