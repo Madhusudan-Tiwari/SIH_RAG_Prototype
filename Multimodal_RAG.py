@@ -1,3 +1,4 @@
+# Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
@@ -10,8 +11,7 @@ SAMPLE_FOLDER = Path("sample_files")
 SUPPORTED_TEXT = [".pdf", ".docx"]
 SUPPORTED_IMAGE = [".png", ".jpg", ".jpeg"]
 SUPPORTED_AUDIO = [".wav", ".mp3"]
-
-MAX_CONVERSATION = 5  # keep last 5 messages
+MAX_CONVERSATION = 5  # max messages to store
 
 # ----------------- Streamlit Setup -----------------
 st.set_page_config(page_title="🎯 Multimodal RAG Prototype", layout="wide")
@@ -25,18 +25,19 @@ top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 # ----------------- Initialize Vector DB -----------------
 vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
 
-# ----------------- Initialize session state -----------------
+# ----------------- Initialize conversation -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []  # [{"role": "user"/"assistant", "content": "..."}]
+    st.session_state.conversation = []
 
-if "vector_db_cache" not in st.session_state:
-    st.session_state.vector_db_cache = {}  # cache embeddings by file name
+# ----------------- Cache processed files -----------------
+if "processed_files" not in st.session_state:
+    st.session_state.processed_files = {}  # filename -> (text, embedding)
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
-    """Process file and cache embedding to avoid recomputation"""
-    if file_path.name in st.session_state.vector_db_cache:
-        return st.session_state.vector_db_cache[file_path.name]
+    filename = file_path.name
+    if filename in st.session_state.processed_files:
+        return st.session_state.processed_files[filename]
 
     ext = file_path.suffix.lower()
     if ext in SUPPORTED_TEXT:
@@ -52,7 +53,7 @@ def process_and_store(file_path):
         return None, None
 
     vector_db.add_vector(emb, text)
-    st.session_state.vector_db_cache[file_path.name] = (text, emb)
+    st.session_state.processed_files[filename] = (text, emb)
     return text, emb
 
 # ----------------- Sample Files Mode -----------------
@@ -87,15 +88,9 @@ else:
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
-# ----------------- Reset App Button -----------------
-if st.button("Reset App"):
-    st.session_state.conversation = []
-    st.session_state.vector_db_cache = {}
-    vector_db.clear()  # make sure VectorDB has a clear method
-    st.experimental_rerun()
-
 # ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
+
 user_input = st.text_area("Type your question...", height=100, key="user_input")
 
 if st.button("Send"):
@@ -104,11 +99,13 @@ if st.button("Send"):
         top_texts = vector_db.query_top_k(user_input, k=top_k)
         # Query LLM with context + previous conversation
         answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
-        # Append to conversation (keep last MAX_CONVERSATION)
+        # Append to conversation
         st.session_state.conversation.append({"role": "user", "content": user_input})
         st.session_state.conversation.append({"role": "assistant", "content": answer})
+        # Keep only last MAX_CONVERSATION messages
         st.session_state.conversation = st.session_state.conversation[-MAX_CONVERSATION:]
-        st.session_state.user_input = ""  # clear input box
+        # Clear input by rerendering
+        st.text_area("Type your question...", height=100, key="user_input", value="")
 
 # ----------------- Display chat history -----------------
 st.subheader("Conversation History")
