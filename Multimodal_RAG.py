@@ -91,6 +91,7 @@ else:
 # ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
 
+# Single text_area with key
 user_input = st.text_area("Type your question...", height=100, key="user_input")
 
 if st.button("Send"):
@@ -104,8 +105,9 @@ if st.button("Send"):
         st.session_state.conversation.append({"role": "assistant", "content": answer})
         # Keep only last MAX_CONVERSATION messages
         st.session_state.conversation = st.session_state.conversation[-MAX_CONVERSATION:]
-        # Clear input by rerendering
-        st.text_area("Type your question...", height=100, key="user_input", value="")
+        # Clear input box
+        st.session_state.user_input = ""  # <-- just clear the session_state value
+
 
 # ----------------- Display chat history -----------------
 st.subheader("Conversation History")
