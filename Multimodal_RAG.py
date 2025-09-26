@@ -1,4 +1,3 @@
-# Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
@@ -11,7 +10,6 @@ SAMPLE_FOLDER = Path("sample_files")
 SUPPORTED_TEXT = [".pdf", ".docx"]
 SUPPORTED_IMAGE = [".png", ".jpg", ".jpeg"]
 SUPPORTED_AUDIO = [".wav", ".mp3"]
-MAX_CONVERSATION = 5  # max messages to store
 
 # ----------------- Streamlit Setup -----------------
 st.set_page_config(page_title="🎯 Multimodal RAG Prototype", layout="wide")
@@ -25,19 +23,19 @@ top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 # ----------------- Initialize Vector DB -----------------
 vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
 
-# ----------------- Initialize conversation -----------------
+# ----------------- Initialize session state -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []
-
-# ----------------- Cache processed files -----------------
+    st.session_state.conversation = []  # stores last 5 messages
 if "processed_files" not in st.session_state:
-    st.session_state.processed_files = {}  # filename -> (text, embedding)
+    st.session_state.processed_files = {}  # cache embeddings to avoid recomputation
+if "user_input" not in st.session_state:
+    st.session_state.user_input = ""
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
-    filename = file_path.name
-    if filename in st.session_state.processed_files:
-        return st.session_state.processed_files[filename]
+    # Skip recomputation
+    if file_path in st.session_state.processed_files:
+        return st.session_state.processed_files[file_path]
 
     ext = file_path.suffix.lower()
     if ext in SUPPORTED_TEXT:
@@ -53,7 +51,7 @@ def process_and_store(file_path):
         return None, None
 
     vector_db.add_vector(emb, text)
-    st.session_state.processed_files[filename] = (text, emb)
+    st.session_state.processed_files[file_path] = (text, emb)
     return text, emb
 
 # ----------------- Sample Files Mode -----------------
@@ -90,24 +88,21 @@ else:
 
 # ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
-
-# Single text_area with key
 user_input = st.text_area("Type your question...", height=100, key="user_input")
 
 if st.button("Send"):
     if user_input.strip():
         # Retrieve top-k relevant contexts
         top_texts = vector_db.query_top_k(user_input, k=top_k)
-        # Query LLM with context + previous conversation
+        # Feed context + question + previous conversation to LLM
         answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
-        # Append to conversation
+        # Save chat
         st.session_state.conversation.append({"role": "user", "content": user_input})
         st.session_state.conversation.append({"role": "assistant", "content": answer})
-        # Keep only last MAX_CONVERSATION messages
-        st.session_state.conversation = st.session_state.conversation[-MAX_CONVERSATION:]
-        # Clear input box
-        st.session_state.user_input = ""  # <-- just clear the session_state value
-
+        # Keep last 5 messages to limit memory usage
+        st.session_state.conversation = st.session_state.conversation[-5:]
+        # Clear input
+        st.session_state.user_input = ""
 
 # ----------------- Display chat history -----------------
 st.subheader("Conversation History")
@@ -115,6 +110,12 @@ chat_container = st.container()
 with chat_container:
     for msg in st.session_state.conversation:
         if msg["role"] == "user":
-            st.markdown(f"<div style='text-align:right; background-color:#DCF8C6; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align:right; background-color:#DCF8C6; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
         else:
-            st.markdown(f"<div style='text-align:left; background-color:#F1F0F0; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align:left; background-color:#F1F0F0; padding:5px; border-radius:10px; margin:5px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
