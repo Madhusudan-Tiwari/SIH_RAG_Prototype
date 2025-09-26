@@ -1,4 +1,3 @@
-# Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
@@ -89,7 +88,6 @@ if st.button("Send") and user_input.strip():
     top_texts = vector_db.query_top_k(user_input, k=top_k)
 
     # Query LLM with full conversation + retrieved contexts
-    # Combine conversation into one string for context
     conversation_context = "\n".join(
         f"{msg['role'].capitalize()}: {msg['content']}" for msg in st.session_state.conversation
     )
