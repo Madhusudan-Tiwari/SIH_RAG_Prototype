@@ -21,14 +21,14 @@ mode = st.sidebar.radio("Choose input mode", ["Sample Files", "Upload Files"])
 top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 
 # ----------------- Initialize Vector DB -----------------
-vector_db = VectorDB(dim=512) # adjust dim according to embedding size
+vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
 
 # ----------------- Initialize session state -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = [] # stores last 5 messages
+    st.session_state.conversation = []  # stores last 5 messages
 if "processed_files" not in st.session_state:
-    st.session_state.processed_files = {} # cache embeddings to avoid recomputation
-# The 'user_input' key is now managed by the form, so we can remove the initialization
+    st.session_state.processed_files = {}  # cache embeddings to avoid recomputation
+# Removed the redundant initialization for 'user_input' as it's now managed by the form
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
@@ -78,6 +78,9 @@ else:
     )
     if uploaded_files:
         for file in uploaded_files:
+            # Note: For uploaded files, you need to save them temporarily 
+            # to a path before 'process_and_store' can use Path(file.name)
+            # This logic might need refinement depending on your exact setup.
             st.write(f"Processing: {file.name}")
             content, emb = process_and_store(Path(file.name))
             if content is not None:
@@ -85,21 +88,20 @@ else:
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
-# ----------------- Chat Section (MODIFIED TO USE FORM) -----------------
+# ----------------- Chat Section (MODIFIED FOR FORM SUBMISSION) -----------------
 st.subheader("Chat with your data")
 
 # Use st.form with clear_on_submit=True to automatically clear the text area
 with st.form("chat_form", clear_on_submit=True):
-    # Use a generic key here
+    # Use a generic key for the widget
     user_input = st.text_area("Type your question...", height=100, key="chat_input_widget") 
     
     # Place the button inside the form
     submitted = st.form_submit_button("Send") 
 
 if submitted and user_input.strip():
-    # Retrieve top-k relevant contexts
-    query_emb = get_text_embedding(user_input)
-    top_texts = vector_db.query_top_k(query_emb, k=top_k) # Assuming query_top_k takes an embedding
+    # Retrieve top-k relevant contexts (FIXED: Pass raw text)
+    top_texts = vector_db.query_top_k(user_input, k=top_k) 
     
     # Feed context + question + previous conversation to LLM
     answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
@@ -111,10 +113,10 @@ if submitted and user_input.strip():
     # Keep last 5 messages to limit memory usage
     st.session_state.conversation = st.session_state.conversation[-5:]
     
-    # Rerun the script to display the new message and clear the input widget (handled by form)
+    # Rerun the script to clear the input and display the new message
     st.rerun() 
 
-# ----------------- Display chat history (MODIFIED FOR SCROLLING) -----------------
+# ----------------- Display chat history (MODIFIED FOR SCROLLING UI) -----------------
 st.subheader("Conversation History")
 # Use a fixed-height container with a border for a scrollable chat window
 chat_container = st.container(height=400, border=True)
@@ -122,13 +124,13 @@ chat_container = st.container(height=400, border=True)
 with chat_container:
     for msg in st.session_state.conversation:
         if msg["role"] == "user":
-            # User message: right-aligned, green-ish, adjusted for chat bubble style
+            # User message: right-aligned, green-ish, chat bubble style
             st.markdown(
                 f"<div style='text-align:right; background-color:#DCF8C6; padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; max-width: 80%; width: fit-content; border-bottom-right-radius: 2px;'>{msg['content']}</div>",
                 unsafe_allow_html=True
             )
         else:
-            # Assistant message: left-aligned, gray-ish, adjusted for chat bubble style
+            # Assistant message: left-aligned, gray-ish, chat bubble style
             st.markdown(
                 f"<div style='text-align:left; background-color:#F1F0F0; padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; max-width: 80%; width: fit-content; border-bottom-left-radius: 2px;'>{msg['content']}</div>",
                 unsafe_allow_html=True
