@@ -1,6 +1,6 @@
-import streamlit as st
 import openai
 import requests
+import streamlit as st
 
 # Optional: for Gemini
 try:
@@ -11,9 +11,9 @@ except ImportError:
 class MultiLLM:
     def __init__(self):
         self.llms = [
-            {"name": "openai", "func": self.query_openai},
-            {"name": "gemini", "func": self.query_gemini},
-            {"name": "perplexity", "func": self.query_perplexity}
+            {"name": "OpenAI", "func": self.query_openai},
+            {"name": "Gemini", "func": self.query_gemini},
+            {"name": "Perplexity", "func": self.query_perplexity}
         ]
 
     # ----------------- OpenAI -----------------
@@ -27,8 +27,7 @@ class MultiLLM:
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"OpenAI failed: {e}")
-            raise
+            raise RuntimeError(f"OpenAI failed: {e}")
 
     # ----------------- Gemini -----------------
     def query_gemini(self, prompt):
@@ -44,8 +43,7 @@ class MultiLLM:
             )
             return response.text.strip()
         except Exception as e:
-            print(f"Gemini failed: {e}")
-            raise
+            raise RuntimeError(f"Gemini failed: {e}")
 
     # ----------------- Perplexity -----------------
     def query_perplexity(self, prompt):
@@ -61,8 +59,7 @@ class MultiLLM:
             response.raise_for_status()
             return response.json().get("answer", "[No answer]")
         except Exception as e:
-            print(f"Perplexity failed: {e}")
-            raise
+            raise RuntimeError(f"Perplexity failed: {e}")
 
     # ----------------- Fallback -----------------
     def query(self, prompt):
@@ -70,11 +67,13 @@ class MultiLLM:
         Try each LLM in order; fallback to next if one fails.
         Returns the first successful answer or '[All LLMs failed]'.
         """
+        failed_llms = []
         for llm in self.llms:
             try:
                 answer = llm["func"](prompt)
                 if answer:
                     return answer
-            except Exception:
+            except Exception as e:
+                failed_llms.append(f"{llm['name']} failed: {str(e)}")
                 continue
-        return "[All LLMs failed]"
+        return f"[All LLMs failed. Errors: {', '.join(failed_llms)}]"
