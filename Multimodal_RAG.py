@@ -28,7 +28,6 @@ if "conversation" not in st.session_state:
     st.session_state.conversation = []  # stores last 5 messages
 if "processed_files" not in st.session_state:
     st.session_state.processed_files = {}  # cache embeddings to avoid recomputation
-# Removed the redundant initialization for 'user_input' as it's now managed by the form
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
@@ -78,9 +77,6 @@ else:
     )
     if uploaded_files:
         for file in uploaded_files:
-            # Note: For uploaded files, you need to save them temporarily 
-            # to a path before 'process_and_store' can use Path(file.name)
-            # This logic might need refinement depending on your exact setup.
             st.write(f"Processing: {file.name}")
             content, emb = process_and_store(Path(file.name))
             if content is not None:
@@ -88,7 +84,27 @@ else:
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
-# ----------------- Chat Section (MODIFIED FOR FORM SUBMISSION) -----------------
+# ----------------- Display chat history (RE-ORDERED & STYLED) -----------------
+st.subheader("Conversation History")
+# Use a fixed-height container with a border for a scrollable chat window
+chat_container = st.container(height=400, border=True)
+
+with chat_container:
+    for msg in st.session_state.conversation:
+        if msg["role"] == "user":
+            # User message: right-aligned, green-ish, black text
+            st.markdown(
+                f"<div style='text-align:right; color:#000000; background-color:#DCF8C6; padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; max-width: 80%; width: fit-content; border-bottom-right-radius: 2px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            # Assistant message: left-aligned, gray-ish, black text
+            st.markdown(
+                f"<div style='text-align:left; color:#000000; background-color:#F1F0F0; padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; max-width: 80%; width: fit-content; border-bottom-left-radius: 2px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
+
+# ----------------- Chat Section (RE-ORDERED & FORM SUBMISSION) -----------------
 st.subheader("Chat with your data")
 
 # Use st.form with clear_on_submit=True to automatically clear the text area
@@ -114,24 +130,4 @@ if submitted and user_input.strip():
     st.session_state.conversation = st.session_state.conversation[-5:]
     
     # Rerun the script to clear the input and display the new message
-    st.rerun() 
-
-# ----------------- Display chat history (MODIFIED FOR SCROLLING UI) -----------------
-st.subheader("Conversation History")
-# Use a fixed-height container with a border for a scrollable chat window
-chat_container = st.container(height=400, border=True)
-
-with chat_container:
-    for msg in st.session_state.conversation:
-        if msg["role"] == "user":
-            # User message: right-aligned, green-ish, chat bubble style
-            st.markdown(
-                f"<div style='text-align:right; background-color:#DCF8C6; padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; max-width: 80%; width: fit-content; border-bottom-right-radius: 2px;'>{msg['content']}</div>",
-                unsafe_allow_html=True
-            )
-        else:
-            # Assistant message: left-aligned, gray-ish, chat bubble style
-            st.markdown(
-                f"<div style='text-align:left; background-color:#F1F0F0; padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; max-width: 80%; width: fit-content; border-bottom-left-radius: 2px;'>{msg['content']}</div>",
-                unsafe_allow_html=True
-            )
+    st.rerun()
