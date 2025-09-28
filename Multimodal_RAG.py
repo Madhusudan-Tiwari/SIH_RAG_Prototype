@@ -1,10 +1,10 @@
+# Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
 from modules.embeddings import get_text_embedding, get_image_embedding
 from modules.vector_db import VectorDB
 from modules.llm_integration import query_llm_with_context
-import tempfile
 
 # ----------------- Configuration -----------------
 SAMPLE_FOLDER = Path("sample_files")
@@ -79,13 +79,7 @@ else:
     if uploaded_files:
         for file in uploaded_files:
             st.write(f"Processing: {file.name}")
-            
-            # Save uploaded file temporarily
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.name).suffix) as tmp:
-                tmp.write(file.read())
-                tmp_path = Path(tmp.name)
-            
-            content, emb = process_and_store(tmp_path)
+            content, emb = process_and_store(Path(file.name))
             if content is not None:
                 st.text_area(f"Preview / embedding info: {file.name}", content, height=150)
                 if emb is not None:
@@ -98,44 +92,39 @@ with chat_container:
     for msg in st.session_state.conversation:
         if msg["role"] == "user":
             st.markdown(
-                f"<div style='text-align:right; background-color:#DCF8C6; padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; max-width: 80%; width: fit-content;'>{msg['content']}</div>",
+                f"<div style='text-align:right; color:#000000; background-color:#DCF8C6; "
+                f"padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; "
+                f"max-width:80%; width:fit-content; border-bottom-right-radius:2px;'>{msg['content']}</div>",
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
-                f"<div style='text-align:left; background-color:#F1F0F0; padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; max-width: 80%; width: fit-content;'>{msg['content']}</div>",
+                f"<div style='text-align:left; color:#000000; background-color:#F1F0F0; "
+                f"padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; "
+                f"max-width:80%; width:fit-content; border-bottom-left-radius:2px;'>{msg['content']}</div>",
                 unsafe_allow_html=True
             )
 
-# ----------------- Chat Section (REVISED FOR EMBEDDING RETRIEVAL) -----------------
+# ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
-
-# Use st.form with clear_on_submit=True to automatically clear the text area
 with st.form("chat_form", clear_on_submit=True):
-    user_input = st.text_area("Type your question...", height=100, key="chat_input_widget") 
-    submitted = st.form_submit_button("Send") 
+    user_input = st.text_area("Type your question...", height=100)
+    submitted = st.form_submit_button("Send")
 
 if submitted and user_input.strip():
-    from modules.embeddings import get_text_embedding
-
-    # Convert user query to embedding
+    # Compute embedding for query
     query_vec = get_text_embedding(user_input)
 
-    # Retrieve top-k relevant document chunks using embedding
+    # Retrieve top-k relevant contexts
     top_texts = vector_db.query_top_k_embedding(query_vec, k=top_k)
 
-    # Debug: show retrieved context (optional)
-    st.write("Retrieved context (top-k):", top_texts)
-
-    # Feed context + question + previous conversation to LLM
+    # Query LLM with context + conversation
     answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
-    
+
     # Save chat
     st.session_state.conversation.append({"role": "user", "content": user_input})
     st.session_state.conversation.append({"role": "assistant", "content": answer})
-    
-    # Keep last 5 messages
     st.session_state.conversation = st.session_state.conversation[-5:]
 
-    # Display answer immediately (no need for rerun)
+    # Refresh the app to show new messages
     st.experimental_rerun()
