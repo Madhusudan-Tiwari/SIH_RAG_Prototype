@@ -127,4 +127,4 @@ if submitted and user_input.strip():
     st.session_state.conversation = st.session_state.conversation[-5:]
 
     # Refresh the app to show new messages
-    st.experimental_rerun()
+    st.rerun()
