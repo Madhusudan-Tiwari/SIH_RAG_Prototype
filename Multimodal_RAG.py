@@ -21,13 +21,13 @@ mode = st.sidebar.radio("Choose input mode", ["Sample Files", "Upload Files"])
 top_k = st.sidebar.slider("Top-k results to retrieve", 1, 5, 3)
 
 # ----------------- Initialize Vector DB -----------------
-vector_db = VectorDB(dim=512)  # adjust dim according to embedding size
+vector_db = VectorDB(dim=512) # adjust dim according to embedding size
 
 # ----------------- Initialize session state -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []  # stores last 5 messages
+    st.session_state.conversation = [] # stores last 5 messages
 if "processed_files" not in st.session_state:
-    st.session_state.processed_files = {}  # cache embeddings to avoid recomputation
+    st.session_state.processed_files = {} # cache embeddings to avoid recomputation
 # The 'user_input' key is now managed by the form, so we can remove the initialization
 
 # ----------------- Helper Function -----------------
