@@ -107,25 +107,27 @@ with chat_container:
                 unsafe_allow_html=True
             )
 
-# ----------------- Chat Section -----------------
+# ----------------- Chat Section (REVISED FOR EMBEDDING RETRIEVAL) -----------------
 st.subheader("Chat with your data")
+
+# Use st.form with clear_on_submit=True to automatically clear the text area
 with st.form("chat_form", clear_on_submit=True):
     user_input = st.text_area("Type your question...", height=100, key="chat_input_widget") 
     submitted = st.form_submit_button("Send") 
 
 if submitted and user_input.strip():
-    # Retrieve top-k relevant contexts
-    top_texts = vector_db.query_top_k(user_input, k=top_k)
-    
-    # DEBUG: Show what the retrieval returned
+    from modules.embeddings import get_text_embedding
+
+    # Convert user query to embedding
+    query_vec = get_text_embedding(user_input)
+
+    # Retrieve top-k relevant document chunks using embedding
+    top_texts = vector_db.query_top_k_embedding(query_vec, k=top_k)
+
+    # Debug: show retrieved context (optional)
     st.write("Retrieved context (top-k):", top_texts)
-    
-    # Fallback: if retrieval empty, feed the whole uploaded doc(s)
-    if not top_texts:
-        all_docs = [v[0] for v in st.session_state.processed_files.values() if v[0]]
-        top_texts = all_docs
-    
-    # Query LLM with context
+
+    # Feed context + question + previous conversation to LLM
     answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
     
     # Save chat
@@ -134,5 +136,6 @@ if submitted and user_input.strip():
     
     # Keep last 5 messages
     st.session_state.conversation = st.session_state.conversation[-5:]
-    
-    st.experimental_rerun()  # Refresh to show latest chat
+
+    # Display answer immediately (no need for rerun)
+    st.experimental_rerun()

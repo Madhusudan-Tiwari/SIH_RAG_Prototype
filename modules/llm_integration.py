@@ -3,19 +3,32 @@ from modules.llm_fallback import MultiLLM
 multi_llm = MultiLLM()
 
 def query_llm_with_context(question, context_list=None, conversation_context=None):
+    """
+    Sends question + retrieved context + previous conversation to LLM.
+    """
     context_list = context_list or []
     context_text = "\n\n".join([str(c) for c in context_list if c])
 
     system_prompt = (
-        "You are a helpful assistant. Use the provided context (if any) "
-        "to answer the question. If the answer is not in the context, say you don't know.\n\n"
+        "You are a helpful assistant. "
+        "Use the provided context (if any) to answer the question. "
+        "If the answer is not in the context, say you don't know."
     )
 
-    final_prompt = system_prompt
-    if conversation_context:
-        final_prompt += f"Conversation history:\n{conversation_context}\n\n"
-    if context_text:
-        final_prompt += f"Context:\n{context_text}\n\n"
-    final_prompt += f"Question: {question}"
+    messages = [{"role": "system", "content": system_prompt}]
 
-    return multi_llm.query(final_prompt)
+    # Add previous conversation
+    if isinstance(conversation_context, list):
+        messages.extend(conversation_context)
+
+    # Add retrieved context
+    if context_text:
+        messages.append({"role": "assistant", "content": f"Context:\n{context_text}"})
+
+    # Add the user question
+    messages.append({"role": "user", "content": question})
+
+    try:
+        return multi_llm.query(messages)
+    except Exception as e:
+        return f"[Error querying LLMs: {str(e)}]"
