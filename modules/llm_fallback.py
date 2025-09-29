@@ -29,40 +29,38 @@ class MultiLLM:
         except Exception as e:
             return f"[OpenAI failed: {e}]"
 
-    # ----------------- Gemini -----------------
-    def query_gemini(self, prompt):
-        if genai is None:
-            return "[Gemini failed: google-genai not installed]"
-        try:
-            client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-            response = client.models.generate_content(
-                model="gemini-1.5-flash", contents=prompt
-            )
-            if isinstance(response.text, list):
-                return "\n".join(response.text)
-            return response.text
-        except Exception as e:
-            return f"[Gemini failed: {e}]"
+# Gemini
+def query_gemini(self, prompt):
+    if genai is None:
+        return "[Gemini failed: google-genai not installed]"
+    try:
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[prompt]  # wrap in list
+        )
+        return response.text if isinstance(response.text, str) else "\n".join(response.text)
+    except Exception as e:
+        return f"[Gemini failed: {e}]"
 
-    # ----------------- Perplexity -----------------
-    def query_perplexity(self, prompt):
-        try:
-            headers = {"Authorization": f"Bearer {st.secrets['PERPLEXITY_API_KEY']}"}
-            response = requests.post(
-                "https://api.perplexity.ai/chat/completions",
-                headers=headers,
-                json={
-                    "model": "llama-3.1-sonar-small-128k-chat",
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            if "choices" in data:
-                return data["choices"][0]["message"]["content"]
-            return "[Perplexity gave no answer]"
-        except Exception as e:
-            return f"[Perplexity failed: {e}]"
+# Perplexity
+def query_perplexity(self, prompt):
+    try:
+        headers = {"Authorization": f"Bearer {st.secrets['PERPLEXITY_API_KEY']}"}
+        response = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json={
+                "model": "llama-3.1-sonar-small-128k-chat",
+                "input": prompt  # use 'input' instead of 'messages'
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("text", "[Perplexity gave no answer]")
+    except Exception as e:
+        return f"[Perplexity failed: {e}]"
+
 
     # ----------------- Query All -----------------
     def query(self, prompt):
