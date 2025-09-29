@@ -1,4 +1,3 @@
-# Multimodal_RAG.py
 import streamlit as st
 from pathlib import Path
 from modules.ingestion import process_text_file, process_image_file, process_audio_file
@@ -32,7 +31,6 @@ if "processed_files" not in st.session_state:
 
 # ----------------- Helper Function -----------------
 def process_and_store(file_path):
-    # Skip recomputation
     if file_path in st.session_state.processed_files:
         return st.session_state.processed_files[file_path]
 
@@ -118,7 +116,7 @@ if submitted and user_input.strip():
     # Retrieve top-k relevant contexts
     top_texts = vector_db.query_top_k_embedding(query_vec, k=top_k)
 
-    # Query LLM with context + conversation
+    # Query Gemini with context + conversation
     answer = query_llm_with_context(user_input, top_texts, st.session_state.conversation)
 
     # Save chat
