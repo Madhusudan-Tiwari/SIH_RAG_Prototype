@@ -97,33 +97,31 @@ class MultiLLM:
             raise RuntimeError(f"Perplexity failed: {e}")
 
     # ----------------- Fallback Logic -----------------
-    def query(self, prompt):
-        """
-        Try each LLM in order; fallback to the next if one fails.
-        Returns the first successful answer or a failure message.
-        """
-        if not prompt or prompt.strip() == "":
-            return "[Please enter a question.]"
-            
-        failed_llms = []
-        for llm in self.llms:
-            try:
-                # Use st.spinner for Streamlit UI feedback
-                st.info(f"Attempting to query {llm['name']}...")
-                with st.spinner(f"Waiting for {llm['name']}..."):
-                    answer = llm["func"](prompt)
-                
-                if answer and answer.strip():
-                    st.success(f"✅ Response received from {llm['name']}.")
-                    return answer
-            except Exception as e:
-                # Log the failure and try the next LLM
-                failed_llms.append(f"{llm['name']}: {str(e)}")
-                continue # Continue to the next LLM in the list
-                
-        # If the loop finishes without a successful return
-        st.error("❌ All LLMs failed to provide a response.")
-        return f"[All LLMs failed. Detailed Errors:\n- {';\n- '.join(failed_llms)}]"
+def query(self, prompt):
+    if not prompt or prompt.strip() == "":
+        return "[Please enter a question.]"
+
+    failed_llms = []
+    for llm in self.llms:
+        try:
+            st.info(f"Attempting to query {llm['name']}...")
+            with st.spinner(f"Waiting for {llm['name']}..."):
+                answer = llm["func"](prompt)
+
+            # --- Normalize all responses to string ---
+            if isinstance(answer, list):
+                answer = " ".join(str(x) for x in answer if x)
+
+            if answer and str(answer).strip():
+                st.success(f"✅ Response received from {llm['name']}.")
+                return str(answer).strip()
+
+        except Exception as e:
+            failed_llms.append(f"{llm['name']}: {str(e)}")
+            continue
+
+    st.error("❌ All LLMs failed to provide a response.")
+    return f"[All LLMs failed. Detailed Errors:\n- {';\n- '.join(failed_llms)}]"
 
 
 # --- Streamlit App Entry Point ---
