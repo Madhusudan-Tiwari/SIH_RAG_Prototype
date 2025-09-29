@@ -13,7 +13,7 @@ class MultiLLM:
             raise ValueError("GEMINI_API_KEY missing in Streamlit secrets")
 
         self.client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-        self.model = "gemini-1.5-flash"
+        self.model = "gemini-2.5-flash-lite"
 
     def query_gemini(self, prompt: str) -> str:
         """
