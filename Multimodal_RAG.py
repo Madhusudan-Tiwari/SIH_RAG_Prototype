@@ -30,9 +30,9 @@ vector_db = st.session_state.vector_db # Use the persistent instance
 
 # ----------------- Initialize session state -----------------
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []  # stores last 5 messages
+    st.session_state.conversation = [] # stores last 5 messages
 if "processed_files" not in st.session_state:
-    st.session_state.processed_files = {}  # cache embeddings to avoid recomputation
+    st.session_state.processed_files = {} # cache embeddings to avoid recomputation
 
 # ----------------- Helper Function -----------------
 def process_and_store(file):
@@ -109,7 +109,31 @@ else:
                 if emb is not None:
                     st.text(f"Embedding vector shape: {emb.shape}")
 
-# ----------------- Chat Section (FIXED: Display Order) -----------------
+# =================================================================
+# 🔄 FIX APPLIED: Move Display Chat History ABOVE Chat Input Form
+# =================================================================
+
+# ----------------- Display chat history -----------------
+st.subheader("Conversation History")
+chat_container = st.container()
+with chat_container:
+    for msg in st.session_state.conversation:
+        if msg["role"] == "user":
+            st.markdown(
+                f"<div style='text-align:right; color:#000000; background-color:#DCF8C6; "
+                f"padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; "
+                f"max-width:80%; width:fit-content; border-bottom-right-radius:2px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"<div style='text-align:left; color:#000000; background-color:#F1F0F0; "
+                f"padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; "
+                f"max-width:80%; width:fit-content; border-bottom-left-radius:2px;'>{msg['content']}</div>",
+                unsafe_allow_html=True
+            )
+
+# ----------------- Chat Section -----------------
 st.subheader("Chat with your data")
 with st.form("chat_form", clear_on_submit=True):
     user_input = st.text_area("Type your question...", height=100)
@@ -137,22 +161,4 @@ if submitted and user_input.strip():
     # Refresh the app to show new messages (or error message)
     st.rerun()
 
-# ----------------- Display chat history (FIXED: Display Order) -----------------
-st.subheader("Conversation History")
-chat_container = st.container()
-with chat_container:
-    for msg in st.session_state.conversation:
-        if msg["role"] == "user":
-            st.markdown(
-                f"<div style='text-align:right; color:#000000; background-color:#DCF8C6; "
-                f"padding:8px 12px; border-radius:15px; margin:5px 0 5px auto; "
-                f"max-width:80%; width:fit-content; border-bottom-right-radius:2px;'>{msg['content']}</div>",
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                f"<div style='text-align:left; color:#000000; background-color:#F1F0F0; "
-                f"padding:8px 12px; border-radius:15px; margin:5px auto 5px 0; "
-                f"max-width:80%; width:fit-content; border-bottom-left-radius:2px;'>{msg['content']}</div>",
-                unsafe_allow_html=True
-            )
+# ----------------- END OF SCRIPT -----------------
