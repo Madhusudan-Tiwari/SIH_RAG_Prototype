@@ -4,18 +4,37 @@ multi_llm = MultiLLM()
 
 def query_llm_with_context(question, context_list=None, conversation_context=None):
     context_list = context_list or []
-    context_text = "\n\n".join([str(c) for c in context_list if c])
+    # Join the top K context documents into a single string, with clear delimiters
+    context_text = "\n\n--- DOCUMENT CONTEXT ---\n\n" + "\n\n".join([str(c) for c in context_list if c]) + "\n\n------------------------\n"
 
-    prompt = "You are a helpful assistant.\n"
-    if context_text:
-        prompt += f"Here is some context from documents:\n{context_text}\n\n"
+    # Start with a strong system prompt to enforce context usage
+    prompt = "You are a specialized RAG assistant. Your primary goal is to answer the user's question ONLY based on the text provided in the 'DOCUMENT CONTEXT' section below. If the answer is not found in the context, clearly state that you cannot answer based on the provided documents.\n"
+    
+    # Add the extracted context
+    if context_list:
+        prompt += context_text
+    else:
+        # If no documents were retrieved, inform the LLM (unlikely now)
+        prompt += "\n\n[NO RELEVANT DOCUMENTS WERE RETRIEVED TO ANSWER THIS QUESTION]\n\n"
+
+    # Add conversation history
     if conversation_context:
-        for msg in conversation_context:
-            prompt += f"{msg['role'].capitalize()}: {msg['content']}\n"
-
-    prompt += f"User: {question}"
+        prompt += "\n--- CONVERSATION HISTORY --UNNECESSARY IN PRODUCTION ---" # Simplified for production 
+        # Removed full history logging to minimize prompt length unless needed for multi-turn.
+    
+    # Add the final question
+    prompt += f"User Query: {question}\n\nAssistant Answer:"
 
     try:
-        return multi_llm.query(prompt)  # now this sends ONE string prompt to Gemini
+        # Revert to calling the API
+        answer = multi_llm.query(prompt)
+        
+        # Explicit check for common LLM API failure strings
+        if answer.startswith("[Gemini failed:") or not answer.strip():
+            return f"Error: LLM returned an empty or failed response. Check API key validity or prompt length."
+            
+        return answer
+        
     except Exception as e:
-        return f"[Error querying LLMs: {str(e)}]"
+        # Return the error message explicitly
+        return f"[FATAL API ERROR]: Failed to get response from Gemini. Check network connection or API key. Error: {str(e)}"
